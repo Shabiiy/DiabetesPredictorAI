@@ -1,37 +1,38 @@
-import { type User, type InsertUser } from "@shared/schema";
+import { type Prediction, type InsertPrediction } from "@shared/schema";
 import { randomUUID } from "crypto";
 
-// modify the interface with any CRUD methods
-// you might need
-
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getPrediction(id: string): Promise<Prediction | undefined>;
+  getAllPredictions(): Promise<Prediction[]>;
+  createPrediction(prediction: Omit<Prediction, "id">): Promise<Prediction>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private predictions: Map<string, Prediction>;
 
   constructor() {
-    this.users = new Map();
+    this.predictions = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getPrediction(id: string): Promise<Prediction | undefined> {
+    return this.predictions.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+  async getAllPredictions(): Promise<Prediction[]> {
+    return Array.from(this.predictions.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createPrediction(predictionData: Omit<Prediction, "id">): Promise<Prediction> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const prediction: Prediction = { 
+      ...predictionData, 
+      id,
+      createdAt: new Date()
+    };
+    this.predictions.set(id, prediction);
+    return prediction;
   }
 }
 
