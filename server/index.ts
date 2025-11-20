@@ -1,3 +1,4 @@
+import path from "path";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -21,7 +22,7 @@ app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
   const start = Date.now();
-  const path = req.path;
+  const reqPath = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
@@ -32,10 +33,14 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    if (reqPath.startsWith("/api")) {
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        try {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        } catch {
+          // ignore serialization errors
+        }
       }
 
       if (logLine.length > 80) {
@@ -52,34 +57,40 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Error handler: respond and log, do NOT re-throw (avoids crashing the process)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
+    const status = err?.status || err?.statusCode || 500;
+    const message = err?.message || "Internal Server Error";
+    console.error(err);
     res.status(status).json({ message });
-    throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Development: use Vite middleware (hot reload). Production: serve built files.
   if (app.get("env") === "development") {
+    // Vite dev middleware will mount and handle client requests
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // Production: serve the static build produced by `vite build`
+    // Build output expected at <repo-root>/dist/public
+    const publicDir = path.join(process.cwd(), "dist", "public");
+
+    // Serve static assets
+    app.use(express.static(publicDir));
+
+    // Fallback to index.html for SPA routes
+    app.get("*", (_req, res) => {
+      res.sendFile(path.join(publicDir, "index.html"));
+    });
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Default to 5000 if not specified.
   const port = parseInt(process.env.PORT || "5000", 10);
 
   server.listen(
     {
       port,
       host: "0.0.0.0",
-      // reusePort removed: not supported on Windows, caused ENOTSUP
     },
     () => {
       log(`serving on port ${port}`);
