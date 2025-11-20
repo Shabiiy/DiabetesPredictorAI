@@ -115,17 +115,21 @@ export default function Predict() {
         <Form {...form}>
           <form 
             onSubmit={(e) => {
-              e.preventDefault();
-              if (currentSection === sections.length - 1) {
-                form.handleSubmit(onSubmit)(e);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && currentSection < sections.length - 1) {
+                // Prevent default form submission. Submission must be triggered
+                // explicitly via the Analyze button (see its onClick).
                 e.preventDefault();
-                setCurrentSection(currentSection + 1);
-              }
-            }}
+              }}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  // Prevent Enter from submitting the form automatically.
+                  // If not on the last section, advance to the next section.
+                  // If on the last section, do nothing so the user must click the Analyze button.
+                  e.preventDefault();
+                  if (currentSection < sections.length - 1) {
+                    setCurrentSection(currentSection + 1);
+                  }
+                }
+              }}
             className="space-y-6"
           >
             <Card data-testid={`section-card-${currentSection}`}>
@@ -244,9 +248,10 @@ export default function Predict() {
                 >
                   Next Section
                 </Button>
-              ) : (
+                ) : (
                 <Button
-                  type="submit"
+                  type="button"
+                  onClick={() => form.handleSubmit(onSubmit)()}
                   disabled={mutation.isPending}
                   className="gap-2"
                   data-testid="button-submit"
