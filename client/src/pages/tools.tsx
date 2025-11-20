@@ -55,9 +55,24 @@ function BMICalculator() {
     const w = parseFloat(weight);
     
     if (!isNaN(h) && !isNaN(w) && h > 0 && w > 0) {
-      const heightInMeters = h / 100;
+      // Accept height in either centimeters (e.g. 170) or meters (e.g. 1.7).
+      // If the entered height is greater than 3, treat it as cm and convert to meters.
+      // If it's <= 3, treat it as meters directly.
+      let heightInMeters = h;
+      if (h > 3) {
+        heightInMeters = h / 100;
+      }
+
+      // Guard against extremely small heights after conversion
+      if (heightInMeters <= 0) {
+        setBmi(null);
+        return;
+      }
+
       const calculatedBMI = w / (heightInMeters * heightInMeters);
       setBmi(calculatedBMI);
+    } else {
+      setBmi(null);
     }
   };
 
